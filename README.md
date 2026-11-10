@@ -1,55 +1,40 @@
 # log-shipper-lite
 
-[![Go Reference](https://pkg.go.dev/badge/github.com/Trysac/u922-log-shipper-lite.svg)](https://pkg.go.dev/github.com/Trysac/u922-log-shipper-lite)
-[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
-[![CI](https://github.com/Trysac/u922-log-shipper-lite/actions/workflows/ci.yml/badge.svg)](https://github.com/Trysac/u922-log-shipper-lite/actions/workflows/ci.yml)
+Tail log files, parse and batch lines into NDJSON, and ship them over HTTP with retries, backpressure, rotation handling, and durable checkpoints.
 
-Tail log files, parse and batch lines, and ship them over HTTP with retries, backpressure and checkpoints so restarts lose nothing
+## Why log-shipper-lite?
 
-## Problem
+Small services often ship logs with ad-hoc scripts that either re-send everything after a restart or silently drop lines when the collector is down. Full agents such as Vector or Fluent Bit can be heavy to deploy and configure when all you need is to ship a handful of files to an HTTP endpoint. `logshipperlite` is a zero-dependency, embeddable Go package and CLI with a clearly specified and property-tested delivery guarantee.
 
-Describe in two or three sentences the concrete problem this utility solves, who hits it, and what
-they do today without it. Replace this paragraph when the first real feature lands.
+## Delivery Guarantee
 
-## Install
+Delivery on the wire is **at-least-once**: a batch stays in memory and the on-disk checkpoint does not advance until the HTTP destination acknowledges with a `2xx` status. Every record carries a deterministic `key` (`<16-char first-line SHA-256 hex>:<byte offset>`), and every HTTP POST carries an `Idempotency-Key` header (`SHA-256(<first_key>|<last_key>)`). When paired with a receiver that deduplicates by `key`, end-to-end delivery is **exactly-once**.
 
-```sh
+## Installation
+
+```bash
 go get github.com/Trysac/u922-log-shipper-lite
 ```
-
-Requires Go 1.23 or newer. No dependencies outside the standard library.
 
 ## Usage
 
 ```go
-package main
-
-import (
-	"errors"
-	"fmt"
-
-	"github.com/Trysac/u922-log-shipper-lite"
-)
-
-func main() {
-	// Normalize trims surrounding whitespace and lower-cases the text.
-	out, _ := logshipperlite.Normalize("  Hello World ")
-	fmt.Println(out) // -> "hello world"
-
-	// Blank input is rejected explicitly instead of returning an empty string.
-	if _, err := logshipperlite.Normalize("   "); errors.Is(err, logshipperlite.ErrBlank) {
-		fmt.Println("rejected:", err)
-	}
+s, err := logshipperlite.New(logshipperlite.Config{
+	Paths:          []string{"/var/log/app/a.log"},
+	CheckpointPath: "/var/lib/app/checkpoint.json",
+	Endpoint:       "https://logs.example.com/ingest",
+})
+if err != nil {
+	panic(err)
 }
+_ = s.Step(ctx)
 ```
 
-## Documentation
+## Public API Summary
 
-- [Architecture](docs/ARCHITECTURE.md) and [decisions](docs/decisions/)
-- [Testing](docs/TESTING.md) and [security](docs/SECURITY.md)
-- [Project record](docs/PROJECT.md) and [stack](docs/STACK.md)
-- [Changelog](CHANGELOG.md) and [contributing guide](CONTRIBUTING.md)
+- **Functions**: `New(cfg Config) (*Shipper, error)`, `Step(ctx) error` (executes one sync read/send cycle), `Run(ctx) error` (main loop), `Stats() Stats`.
+- **Config Options**: `BatchMaxRecords` (500), `BatchMaxBytes` (1MB), `MaxPendingBatches` (4), `MaxLineBytes` (65,536), `PollInterval` (1s), `MaxRetries` (10).
+- **Error Codes**: `rejected` (permanent 4xx), `retries_exhausted` (transient failure limit reached), `bad_checkpoint`, `bad_config`, `io`.
+- **Why not Vector or Fluent Bit**: This utility provides a zero-dependency, embeddable Go package, making it suitable for simple, single-purpose deployments where heavy agent orchestration is unnecessary.
 
-## License
-
-[MIT](LICENSE) (c) 2026 Miguel Gomez
+See [docs/SECURITY.md](docs/SECURITY.md) for security information.

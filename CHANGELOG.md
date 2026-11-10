@@ -9,4 +9,5 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
+- Added logshipperlite package and CLI for tailing log files, batching NDJSON records with first-line fingerprints, shipping over HTTP with retries and backpressure, and persisting atomic checkpoints.
 - Initial project structure from the factory utility template.
