@@ -1,0 +1,18 @@
+# Build output
+/bin/
+/dist/
+*.exe
+*.test
+
+# Coverage
+*.out
+coverage.*
+
+# Workspaces (local only)
+go.work
+go.work.sum
+
+# Local environment
+.env
+.env.*
+!.env.example

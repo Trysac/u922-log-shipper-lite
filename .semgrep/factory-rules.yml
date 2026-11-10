@@ -1,0 +1,62 @@
+# Semgrep CE rules owned by the factory (MIT, like this repository). The semgrep gate in scripts/check runs
+# only this file; Semgrep-maintained registry rules are never used (their license forbids distribution and
+# service use). Every rule is ERROR: a match fails the gate. Factory-owned file: agents must not edit it.
+rules:
+  - id: fabrica.go.exec-through-shell
+    languages: [go]
+    severity: ERROR
+    message: Running a command through "sh", "-c" (or cmd /c) allows command injection. Call exec.Command with the program and its arguments.
+    pattern-either:
+      - pattern: exec.Command("sh", "-c", ...)
+      - pattern: exec.Command("bash", "-c", ...)
+      - pattern: exec.Command("/bin/sh", "-c", ...)
+      - pattern: exec.Command("cmd", "/c", ...)
+      - pattern: exec.CommandContext($CTX, "sh", "-c", ...)
+      - pattern: exec.CommandContext($CTX, "bash", "-c", ...)
+      - pattern: exec.CommandContext($CTX, "/bin/sh", "-c", ...)
+      - pattern: exec.CommandContext($CTX, "cmd", "/c", ...)
+  - id: fabrica.go.tls-verification-disabled
+    languages: [go]
+    severity: ERROR
+    message: "TLS certificate verification is disabled (InsecureSkipVerify: true), so any server can impersonate the real one."
+    pattern-either:
+      - pattern: "tls.Config{..., InsecureSkipVerify: true, ...}"
+      - pattern: $CFG.InsecureSkipVerify = true
+  - id: fabrica.go.unescaped-template
+    languages: [go]
+    severity: ERROR
+    message: Converting dynamic data to template.HTML, template.JS or template.URL disables html/template escaping (cross-site scripting). Pass the plain string.
+    patterns:
+      - pattern-either:
+          - pattern: template.HTML($X)
+          - pattern: template.JS($X)
+          - pattern: template.URL($X)
+      - pattern-not: template.HTML("...")
+      - pattern-not: template.JS("...")
+      - pattern-not: template.URL("...")
+  - id: fabrica.go.unsafe-deserialization
+    languages: [go]
+    severity: ERROR
+    message: gob decoding into an empty interface lets the input choose the concrete types registered in the program. Decode into a concrete struct.
+    # Scoped to encoding/gob: decoding JSON into an interface{} is ordinary code and is not this risk.
+    patterns:
+      - pattern-inside: |
+          var $V interface{}
+          ...
+      - pattern-either:
+          - pattern: gob.NewDecoder($R).Decode(&$V)
+          - patterns:
+              - pattern-inside: |
+                  $DEC := gob.NewDecoder($R)
+                  ...
+              - pattern: $DEC.Decode(&$V)
+  - id: fabrica.go.hardcoded-secret
+    languages: [go]
+    severity: ERROR
+    message: A credential (private key, AKIA access key, GitHub, Slack or Stripe token) is hard-coded in the source. Read it from the environment.
+    pattern-either:
+      - pattern-regex: -----BEGIN (RSA |EC |DSA |OPENSSH |ENCRYPTED )?PRIVATE KEY-----
+      - pattern-regex: \b(AKIA|ASIA)[0-9A-Z]{16}\b
+      - pattern-regex: \bgh[pousr]_[A-Za-z0-9]{36}\b
+      - pattern-regex: \bxox[baprs]-[A-Za-z0-9-]{10,}\b
+      - pattern-regex: \bsk_live_[A-Za-z0-9]{24,}\b

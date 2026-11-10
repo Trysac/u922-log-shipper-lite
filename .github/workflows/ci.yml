@@ -1,0 +1,21 @@
+# CI for this repository lives in Trysac/factory-ci (reusable workflow, go): it re-runs this repository's own
+# gates. Changing the factory's CI is one release there, not one pull request per repository.
+# Factory-owned file: agents must not edit it.
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  ci:
+    uses: Trysac/factory-ci/.github/workflows/go.yml@v1
+    secrets: inherit

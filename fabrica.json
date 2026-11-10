@@ -1,0 +1,1 @@
+{"lang": "go", "package": "github.com/Trysac/u922-log-shipper-lite", "commands": {"install": [["go", "mod", "download"]], "check": [["go", "run", "./scripts/check"]]}}
