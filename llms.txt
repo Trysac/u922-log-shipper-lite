@@ -6,11 +6,9 @@
 ## Docs
 
 - [README](README.md): problem, install, usage example
-- [AGENTS](AGENTS.md): commands, folder map, conventions, limits
 - [Architecture](docs/ARCHITECTURE.md): shape of the package and its public API
 - [Testing](docs/TESTING.md): how to run and extend the tests
 
 ## Optional
 
 - [Stack](docs/STACK.md): tools used and discarded
-- [Changelog](CHANGELOG.md): release history

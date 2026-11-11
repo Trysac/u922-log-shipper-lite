@@ -1,23 +1,13 @@
-# Security notes
+# Security & Threat Model
 
-## Threat model
+## Defended
 
-`github.com/Trysac/u922-log-shipper-lite` is a pure library without I/O. The main risks are:
+- **Log line length**: Lines are capped at `Config.MaxLineBytes` (65,536 bytes). Excess bytes are discarded to prevent memory exhaustion.
+- **Backpressure**: Memory usage is bounded by `Config.MaxPendingBatches` (default 4) and batch size limits.
+- **Checkpoint integrity**: Checkpoint files are validated for version 1, strict schema, and non-negative offsets. Files are written atomically using `fsync` and `os.Rename`.
+- **Leakage**: Error messages and `Event` payloads are designed to exclude log line contents to prevent sensitive data leakage.
 
-- **Supply chain**: a compromised dependency or CI action. Mitigation: standard library only,
-  `go.sum` verification, `govulncheck` in the local gates, Dependabot weekly updates, actions
-  pinned by commit SHA, minimal workflow permissions.
-- **Leaked secrets**: tokens committed by mistake. Mitigation: `gitleaks` runs in the local gates
-  and in CI; `.env` files are git-ignored.
-- **Insecure code**: disabled TLS verification, weak crypto, command injection. Mitigation: a
-  `security` gate (gosec, high severity fails, `#nosec` ignored); fix the code instead of silencing
-  it.
-- **Untrusted input**: callers may pass hostile strings. Mitigation: validate input and return
-  explicit errors; never use `unsafe` or `os/exec` with untrusted data.
+## Not defended
 
-## Publishing
-
-Releases are git tags served through the Go module proxy and checksum database. No registry token
-is stored in the repository.
-
-To report a vulnerability, see [SECURITY.md](../SECURITY.md).
+- **Arbitrary file access**: Relies on host OS file permissions to secure source log files.
+- **Remote endpoint compromise**: The utility trusts the HTTP destination to correctly handle deduplication via `Idempotency-Key`.
